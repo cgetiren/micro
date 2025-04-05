@@ -13,6 +13,7 @@ import string
 from interception import *
 import ctypes
 from ctypes import wintypes
+import cv2
 
 # Windows API fonksiyonları
 GetForegroundWindow = ctypes.windll.user32.GetForegroundWindow
@@ -30,7 +31,19 @@ class MainWindow(QWidget):
         self.config_file = "config.json"
         self.tuslar = []
         self.keyboard = None
+        
+        # Debug klasörünü oluştur
+        self.debug_mode = False  # Debug modu varsayılan olarak kapalı
+        if self.debug_mode:
+            os.makedirs('images', exist_ok=True)
+        
         self.keycodes = {"F1" : 0x3B,"F2" : 0x3C,"F3" : 0x3D,"F4" : 0x3E,"F5" : 0x3F,"F6" : 0x40,"F7" : 0x41,"F8" : 0x42,"F9" : 0x43,"F10" : 0x44,"F11" : 0x57,"F12" : 0x58,"F13" : 0x64,"F14" : 0x65,"F15" : 0x66,"0" : 0x0B,"1" : 0x02,"2" : 0x03,"3" : 0x04,"4" : 0x05,"5" : 0x06,"6" : 0x07,"7" : 0x08,"8" : 0x09,"9" : 0x0A,"A" : 0x1E,"B" : 0x30,"C" : 0x2E,"D" : 0x20,"E" : 0x12,"F" : 0x21,"G" : 0x22,"H" : 0x23,"I" : 0x17,"J" : 0x24,"K" : 0x25,"L" : 0x26,"M" : 0x32,"N" : 0x31,"O" : 0x18,"P" : 0x19,"Q" : 0x10,"R" : 0x13,"S" : 0x1F,"T" : 0x14,"U" : 0x16,"V" : 0x2F,"W" : 0x11,"X" : 0x2D,"Y" : 0x15,"Z" : 0x2C}
+        
+        # Hedef tespiti için değişkenler
+        self.target_detection = False
+        self.last_target_state = False
+        self.target_locate = []  # Hedef çubuğunun konumu
+        self.sct = mss.mss()
         
         try:
             self.driver = interception()
@@ -208,6 +221,11 @@ class MainWindow(QWidget):
         self.Makro_use_checkbox = QCheckBox("Makro Kullan")
         self.Makro_use_checkbox.stateChanged.connect(self.Makro_use_func)
 
+        # Hedef Çubuğu Butonu
+        self.take_target_locate = QPushButton("Hedef Çubuğu Konumu Al")
+        self.take_target_locate.clicked.connect(self.take_target_locate_pressed)
+        self.take_target_locate.setToolTip("Hedef çubuğunun sol üst köşesine tıklayın ve CTRL tuşuna basın")
+
         self.setup_layout()
 
     def setup_layout(self):
@@ -240,6 +258,10 @@ class MainWindow(QWidget):
         heal_mana_row.addLayout(mana_layout)
         heal_mana_group.addLayout(heal_mana_row)
         
+        # Target Section
+        target_group = QVBoxLayout()
+        target_group.addWidget(self.take_target_locate)
+        
         # Makro Section
         makro_group = QVBoxLayout()
         
@@ -271,6 +293,7 @@ class MainWindow(QWidget):
         
         # Add all sections to main layout
         main_layout.addLayout(heal_mana_group)
+        main_layout.addLayout(target_group)  # Hedef çubuğu bölümünü ekle
         main_layout.addLayout(makro_group)
         main_layout.addLayout(control_buttons)
         
@@ -313,6 +336,9 @@ class MainWindow(QWidget):
         if not self.working:
             try:
                 self.Makro_keys = [i for i in self.Makro_keys_input.text().upper()]
+                # Z tuşunu başlangıçta kaldır, hedef tespiti ekleyecek
+                if 'Z' in self.Makro_keys:
+                    self.Makro_keys.remove('Z')
             except ValueError:
                 self.Makro_keys_input = 'Bir hata oluştu'
 
@@ -374,19 +400,96 @@ class MainWindow(QWidget):
             self.mana_locate = []
             self.take_mana_locate.setText("MP Kordinatlarını Al")
 
-    def is_knight_online_active(self):
-        hwnd = GetForegroundWindow()
-        length = GetWindowTextLengthW(hwnd)
-        buff = ctypes.create_unicode_buffer(length + 1)
-        GetWindowTextW(hwnd, buff, length + 1)
-        window_title = buff.value
-        return any(title in window_title for title in ["Knight OnLine Client", "KnightOnLine", "Knight Online"])
+    def take_target_locate_pressed(self):
+        if len(self.target_locate) == 0:
+            self.target_job = 6  # Yeni bir job numarası
+        elif len(self.target_locate) > 0:
+            self.target_locate = []
+            self.take_target_locate.setText("Hedef Çubuğu Konumu Al")
+
+    def take_target_screenshot(self):
+        if len(self.target_locate) != 2:
+            return None
+        # Her seferinde yeni bir MSS nesnesi oluştur
+        with mss.mss() as sct:
+            # Hedef çubuğunun olduğu bölgenin ekran görüntüsünü al
+            # Genişlik ve yüksekliği artırıyoruz ki hedef çubuğunu tam kapsasın
+            monitor = {
+                "top": max(0, self.target_locate[1] - 5),  # Biraz yukarıdan başla
+                "left": max(0, self.target_locate[0] - 5),  # Biraz soldan başla
+                "width": 400,  # Hedef çubuğunun tamamını kapsayacak genişlik
+                "height": 50   # Hedef çubuğunun tamamını kapsayacak yükseklik
+            }
+            screenshot = np.array(sct.grab(monitor))
+            
+            # Debug modunda görüntüyü kaydet
+            if self.debug_mode:
+                cv2.imwrite(f'images/raw_screenshot_{time.time()}.jpg', screenshot)
+            
+            return cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
+
+    def check_target(self):
+        img = self.take_target_screenshot()
+        if img is None:
+            return False
+            
+        # Hedef çubuğunun rengini kontrol et
+        # Knight Online'da hedef çubuğu genellikle kırmızı renktedir
+        # BGR formatında: Kırmızı için düşük mavi(B) ve yeşil(G), yüksek kırmızı(R)
+        red_mask = (
+            (img[:, :, 0] < 100) &  # Düşük mavi
+            (img[:, :, 1] < 100) &  # Düşük yeşil
+            (img[:, :, 2] > 150)    # Yüksek kırmızı
+        )
+        
+        # Kırmızı piksellerin sayısını kontrol et
+        red_pixel_count = np.sum(red_mask)
+        has_target = red_pixel_count > 100  # En az 100 kırmızı piksel varsa hedef var demektir
+        
+        # Debug modunda görüntüleri kaydet
+        if self.debug_mode:
+            timestamp = time.time()
+            debug_img = img.copy()
+            # Tespit edilen kırmızı alanları yeşil ile işaretle
+            debug_img[red_mask] = [0, 255, 0]
+            cv2.imwrite(f'images/debug_{timestamp}_pixels_{red_pixel_count}.jpg', debug_img)
+        
+        # Hedef durumu değiştiyse makro tuşlarını güncelle
+        if has_target != self.last_target_state:
+            print(f"Hedef durumu değişti: {'Var' if has_target else 'Yok'} (Kırmızı piksel sayısı: {red_pixel_count})")
+            if has_target:
+                # Hedef varsa Z tuşunu kaldır
+                if 'Z' in self.Makro_keys:
+                    self.Makro_keys.remove('Z')
+            else:
+                # Hedef yoksa Z tuşunu ekle
+                if 'Z' not in self.Makro_keys:
+                    self.Makro_keys.append('Z')
+            
+            # Makro tuşlarını güncelle
+            self.Makro_keys_input.setText(''.join(self.Makro_keys))
+        
+        self.last_target_state = has_target
+        return has_target
+
+    def target_detection_helper(self):
+        print("Hedef tespit sistemi başlatıldı...")
+        while self.working and self.target_detection:
+            if self.is_knight_online_active():
+                try:
+                    self.check_target()
+                except Exception as e:
+                    print(f"Hedef tespitinde hata: {e}")
+            time.sleep(0.1)  # Her 100ms'de bir kontrol et
+        print("Hedef tespit sistemi durduruldu.")
 
     def Makro(self):
-        random.shuffle(self.Makro_keys)
         while (self.working and self.Makro_use and self.Makro_using):
-            if self.is_knight_online_active():  # Sadece KnightOnline aktif pencereyse makro çalışsın
-                for i in self.Makro_keys:
+            if self.is_knight_online_active():
+                # Her döngüde tuşları karıştır
+                current_keys = self.Makro_keys.copy()
+                random.shuffle(current_keys)
+                for i in current_keys:
                     self.tusbas(self.keycodes[i], 0.001)
             time.sleep(self.Makro_ms/1000)
 
@@ -477,12 +580,15 @@ class MainWindow(QWidget):
             self.working = True
             if self.Makro_use:
                 self.Makro_using = True
+                self.target_detection = True
                 threading.Thread(target=self.Makro, daemon=True).start()
+                threading.Thread(target=self.target_detection_helper, daemon=True).start()
             if self.oto_heal or self.oto_mana:
                 threading.Thread(target=self.heal_mana_helper, daemon=True).start()
             self.start_stop_shortcut_buton.setStyleSheet("background-color: #387040; color: #FFFFFF;")
         elif self.working == True:
             self.working = False
+            self.target_detection = False
             self.start_stop_shortcut_buton.setStyleSheet("background-color: #702F2F; color: #FFFFFF;")
 
     def key_listener(self):
@@ -529,6 +635,8 @@ class MainWindow(QWidget):
                     handle_target_job(self.take_heal_locate, self.heal_locate, "HP Kordinatları Alındı")
                 elif self.target_job == 2:
                     handle_target_job(self.take_mana_locate, self.mana_locate, "MP Kordinatları Alındı")
+                elif self.target_job == 6:  # Yeni hedef çubuğu konumu için
+                    handle_target_job(self.take_target_locate, self.target_locate, "Hedef Çubuğu Konumu Alındı")
             elif self.target_job == 3:
                 self.heal_shortcut = handle_shortcut(self.heal_shortcut, key, self.heal_shortcut_button, "HP")
             elif self.target_job == 4:
@@ -631,6 +739,14 @@ class MainWindow(QWidget):
         self.Makro_use_continuously.setChecked(self.Makro_use_continuously_bool)
         self.Makro_use_checkbox.setChecked(self.Makro_use)
         self.Makro_ms_changed()
+
+    def is_knight_online_active(self):
+        hwnd = GetForegroundWindow()
+        length = GetWindowTextLengthW(hwnd)
+        buff = ctypes.create_unicode_buffer(length + 1)
+        GetWindowTextW(hwnd, buff, length + 1)
+        window_title = buff.value
+        return any(title in window_title for title in ["Knight OnLine Client", "KnightOnLine", "Knight Online"])
 
 if __name__ == "__main__":
     app = QApplication([])
