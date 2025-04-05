@@ -162,51 +162,64 @@ class MainWindow(QWidget):
         # Buttons and controls from both programs
         self.saveButton = QPushButton("Kaydet")
         self.saveButton.clicked.connect(self.save_config)
-        self.saveButton.setToolTip("Tüm ayarları kaydeder.")
+        self.saveButton.setToolTip("Tüm ayarları kaydeder. Kaydedilen ayarlar config.json dosyasına yazılır.")
 
         self.loadButton = QPushButton("Yükle")
         self.loadButton.clicked.connect(self.load_config)
-        self.loadButton.setToolTip("Tüm ayarları yükler.")
+        self.loadButton.setToolTip("Kaydedilmiş ayarları config.json dosyasından yükler.")
+
+        self.resetButton = QPushButton("Sıfırla")
+        self.resetButton.clicked.connect(self.reset_config)
+        self.resetButton.setToolTip("Tüm ayarları varsayılan değerlerine döndürür.")
 
         self.start_stop_shortcut_buton = QPushButton("Başlat/Durdur")
         self.start_stop_shortcut_buton.clicked.connect(self.start_stop_shortcut_clicked)
+        self.start_stop_shortcut_buton.setToolTip("Makroyu başlatmak/durdurmak için kullanılacak kısayol tuşunu belirler.")
 
         # Heal/Mana Controls
         self.take_heal_locate = QPushButton("HP Kordinatlarını Al")
         self.take_heal_locate.clicked.connect(self.take_heal_locate_pressed)
+        self.take_heal_locate.setToolTip("HP barının konumunu belirlemek için fareyi HP barının üzerine getirin ve CTRL tuşuna basın.")
         
         self.take_mana_locate = QPushButton("MP Kordinatlarını Al")
         self.take_mana_locate.clicked.connect(self.take_mana_locate_pressed)
+        self.take_mana_locate.setToolTip("MP barının konumunu belirlemek için fareyi MP barının üzerine getirin ve CTRL tuşuna basın.")
         
         self.heal_shortcut_button = QPushButton("Hp")
         self.heal_shortcut_button.clicked.connect(self.heal_shortcut_clicked)
+        self.heal_shortcut_button.setToolTip("HP potunu kullanmak için kısayol tuşunu belirler.")
         
         self.mana_shortcut_button = QPushButton("Mp")
         self.mana_shortcut_button.clicked.connect(self.mana_shortcut_clicked)
+        self.mana_shortcut_button.setToolTip("MP potunu kullanmak için kısayol tuşunu belirler.")
 
         # Checkboxes
         self.oto_heal_checkbox = QCheckBox("Oto-HP")
         self.oto_heal_checkbox.stateChanged.connect(self.oto_heal_func)
+        self.oto_heal_checkbox.setToolTip("HP barı belirlenen seviyenin altına düştüğünde otomatik pot kullanır.")
         
         self.oto_mana_checkbox = QCheckBox("Oto-MP")
         self.oto_mana_checkbox.stateChanged.connect(self.oto_mana_func)
+        self.oto_mana_checkbox.setToolTip("MP barı belirlenen seviyenin altına düştüğünde otomatik pot kullanır.")
 
         # Combo boxes
         self.oto_heal_page = 'F Sayfası'
         self.oto_heal_page_combo_box = QComboBox()
         self.oto_heal_page_combo_box.addItems(['F Sayfası','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'])
         self.oto_heal_page_combo_box.currentTextChanged.connect(self.oto_heal_page_combo_box_changed)
+        self.oto_heal_page_combo_box.setToolTip("HP potu kullanmadan önce geçilecek F tuşu sayfasını belirler. 'F Sayfası' seçilirse sayfa değiştirilmez.")
         
         self.oto_mana_page = 'F Sayfası'
         self.oto_mana_page_combo_box = QComboBox()
         self.oto_mana_page_combo_box.addItems(['F Sayfası','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'])
         self.oto_mana_page_combo_box.currentTextChanged.connect(self.oto_mana_page_combo_box_changed)
+        self.oto_mana_page_combo_box.setToolTip("MP potu kullanmadan önce geçilecek F tuşu sayfasını belirler. 'F Sayfası' seçilirse sayfa değiştirilmez.")
 
         # Makro Controls
         self.Makro_keys_label = QLabel("Makro:")
         self.Makro_keys_input = QLineEdit()
         self.Makro_keys_input.setText(self.Makro_keys)
-        self.Makro_keys_input.setToolTip("Makro içerisinde kullanılacak tuş(lar). Boş bırakırsanız çalışmaz.")
+        self.Makro_keys_input.setToolTip("Makroda kullanılacak tuşları girin. Örnek: 123F1F2 (Z tuşunu eklemeyin, otomatik eklenecek)")
         self.Makro_keys_input.textChanged.connect(self.Makro_keys_func)
         
         self.Makro_ms_label = QLabel("Hız: 0001")
@@ -214,17 +227,20 @@ class MainWindow(QWidget):
         self.Makro_ms_input.setMinimum(1)
         self.Makro_ms_input.setMaximum(1000)
         self.Makro_ms_input.valueChanged.connect(self.Makro_ms_changed)
+        self.Makro_ms_input.setToolTip("Makronun çalışma hızını belirler. 1-1000 ms arasında ayarlanabilir.")
         
         self.Makro_use_continuously = QCheckBox("Sürekli kullan")
         self.Makro_use_continuously.stateChanged.connect(self.Makro_use_continuously_func)
+        self.Makro_use_continuously.setToolTip("İşaretlenirse makro sürekli çalışır, işaretlenmezse bir kere çalışıp durur.")
         
         self.Makro_use_checkbox = QCheckBox("Makro Kullan")
         self.Makro_use_checkbox.stateChanged.connect(self.Makro_use_func)
+        self.Makro_use_checkbox.setToolTip("Makroyu aktif/pasif yapar.")
 
         # Hedef Çubuğu Butonu
         self.take_target_locate = QPushButton("Hedef Çubuğu Konumu Al")
         self.take_target_locate.clicked.connect(self.take_target_locate_pressed)
-        self.take_target_locate.setToolTip("Hedef çubuğunun sol üst köşesine tıklayın ve CTRL tuşuna basın")
+        self.take_target_locate.setToolTip("Hedef çubuğunun sol üst köşesine tıklayın ve CTRL tuşuna basın. Bu konum hedef tespiti için kullanılacak.")
 
         self.setup_layout()
 
@@ -289,18 +305,19 @@ class MainWindow(QWidget):
         save_load = QHBoxLayout()
         save_load.addWidget(self.saveButton)
         save_load.addWidget(self.loadButton)
+        save_load.addWidget(self.resetButton)
         control_buttons.addLayout(save_load)
         
         # Add all sections to main layout
         main_layout.addLayout(heal_mana_group)
-        main_layout.addLayout(target_group)  # Hedef çubuğu bölümünü ekle
+        main_layout.addLayout(target_group)
         main_layout.addLayout(makro_group)
         main_layout.addLayout(control_buttons)
         
         # Add contact information
         contact_label = QLabel()
         contact_label.setOpenExternalLinks(True)
-        contact_label.setText("<a href='https://github.com/cgetiren/' style='color: red;'>iletişim: Github/cgetiren</a>")
+        contact_label.setText("<a href='https://github.com/cgetiren/' style='color: white;'>iletişim: github/cgetiren</a>")
         main_layout.addWidget(contact_label)
         
         self.setLayout(main_layout)
@@ -682,7 +699,8 @@ class MainWindow(QWidget):
             '42': self.Makro_ms,
             '52': self.start_shortcut,
             '6_8': self.oto_mana_page,
-            '6_9': self.oto_heal_page
+            '6_9': self.oto_heal_page,
+            'target_locate': self.target_locate  # Hedef çubuğu konumu eklendi
         }
 
         with open(self.config_file, "w", encoding='utf-8') as f:
@@ -711,6 +729,7 @@ class MainWindow(QWidget):
             self.start_shortcut = config.get('52', '')
             self.oto_mana_page = config.get('6_8', 'F Sayfası')
             self.oto_heal_page = config.get('6_9', 'F Sayfası')
+            self.target_locate = config.get('target_locate', [])  # Hedef çubuğu konumu yüklendi
         self.fonksiyonlari_cagir()
 
     def fonksiyonlari_cagir(self):
@@ -735,6 +754,8 @@ class MainWindow(QWidget):
             self.oto_heal_page_combo_box.setCurrentText(self.oto_heal_page)
         if len(self.Makro_keys) > 0:
             self.Makro_keys_input.setText(''.join(self.Makro_keys))
+        if len(self.target_locate) > 0:  # Hedef çubuğu konumu kontrolü eklendi
+            self.take_target_locate.setText("Hedef Çubuğu Konumu Alındı")
         self.Makro_ms_input.setValue(self.Makro_ms)
         self.Makro_use_continuously.setChecked(self.Makro_use_continuously_bool)
         self.Makro_use_checkbox.setChecked(self.Makro_use)
@@ -747,6 +768,59 @@ class MainWindow(QWidget):
         GetWindowTextW(hwnd, buff, length + 1)
         window_title = buff.value
         return any(title in window_title for title in ["Knight OnLine Client", "KnightOnLine", "Knight Online"])
+
+    def reset_config(self):
+        # Onay mesajı göster
+        reply = QMessageBox.question(self, 'Onay', 
+                                   'Tüm ayarları sıfırlamak istediğinizden emin misiniz?\nBu işlem geri alınamaz!',
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            # HP/MP ayarlarını sıfırla
+            self.oto_heal = False
+            self.heal_locate = []
+            self.heal_min = 15
+            self.heal_shortcut = ''
+            self.oto_mana = False
+            self.mana_locate = []
+            self.mana_min = 15
+            self.mana_shortcut = ''
+            
+            # Makro ayarlarını sıfırla
+            self.Makro_keys = ''
+            self.Makro_ms = 1
+            self.Makro_use_continuously_bool = False
+            self.Makro_using = False
+            self.Makro_use = True
+            
+            # Hedef tespiti ayarlarını sıfırla
+            self.target_detection = False
+            self.last_target_state = False
+            self.target_locate = []
+            
+            # Başlat/Durdur tuşunu sıfırla
+            self.start_shortcut = ''
+            
+            # F sayfası ayarlarını sıfırla
+            self.oto_mana_page = 'F Sayfası'
+            self.oto_heal_page = 'F Sayfası'
+            
+            # Tuş listesini temizle
+            self.tuslar = []
+            
+            # UI'ı güncelle
+            self.fonksiyonlari_cagir()
+            
+            # Butonları varsayılan metinlerine döndür
+            self.take_heal_locate.setText("HP Kordinatlarını Al")
+            self.take_mana_locate.setText("MP Kordinatlarını Al")
+            self.heal_shortcut_button.setText("HP")
+            self.mana_shortcut_button.setText("MP")
+            self.start_stop_shortcut_buton.setText("Başlat/Durdur")
+            self.take_target_locate.setText("Hedef Çubuğu Konumu Al")
+            
+            # Bilgi mesajı göster
+            QMessageBox.information(self, "Bilgi", "Tüm ayarlar başarıyla sıfırlandı.")
 
 if __name__ == "__main__":
     app = QApplication([])
