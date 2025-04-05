@@ -11,6 +11,13 @@ from pynput.keyboard import Listener, Key
 import mss
 import string
 from interception import *
+import ctypes
+from ctypes import wintypes
+
+# Windows API fonksiyonları
+GetForegroundWindow = ctypes.windll.user32.GetForegroundWindow
+GetWindowTextLengthW = ctypes.windll.user32.GetWindowTextLengthW
+GetWindowTextW = ctypes.windll.user32.GetWindowTextW
 
 class MainWindow(QWidget):
     information_signal = pyqtSignal(str)
@@ -367,11 +374,20 @@ class MainWindow(QWidget):
             self.mana_locate = []
             self.take_mana_locate.setText("MP Kordinatlarını Al")
 
+    def is_knight_online_active(self):
+        hwnd = GetForegroundWindow()
+        length = GetWindowTextLengthW(hwnd)
+        buff = ctypes.create_unicode_buffer(length + 1)
+        GetWindowTextW(hwnd, buff, length + 1)
+        window_title = buff.value
+        return any(title in window_title for title in ["Knight OnLine Client", "KnightOnLine", "Knight Online"])
+
     def Makro(self):
         random.shuffle(self.Makro_keys)
         while (self.working and self.Makro_use and self.Makro_using):
-            for i in self.Makro_keys:
-                self.tusbas(self.keycodes[i], 0.001)
+            if self.is_knight_online_active():  # Sadece KnightOnline aktif pencereyse makro çalışsın
+                for i in self.Makro_keys:
+                    self.tusbas(self.keycodes[i], 0.001)
             time.sleep(self.Makro_ms/1000)
 
     def heal_mana_helper(self):
