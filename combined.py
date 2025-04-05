@@ -14,6 +14,7 @@ from interception import *
 import ctypes
 from ctypes import wintypes
 import cv2
+import configparser
 
 # Windows API fonksiyonları
 GetForegroundWindow = ctypes.windll.user32.GetForegroundWindow
@@ -28,7 +29,7 @@ class MainWindow(QWidget):
         self.i = 0
         self.start_shortcut = ''
         self.screenshot = None
-        self.config_file = "config.json"
+        self.config_file = "settings.ini"
         self.tuslar = []
         self.keyboard = None
         
@@ -677,60 +678,59 @@ class MainWindow(QWidget):
             pass
 
     def save_config(self):
-        old_save = 'old_save.json'
-        if not os.path.exists(old_save) and os.path.exists(self.config_file):
-            with open(self.config_file, "r", encoding='utf-8') as f:
-                config = json.load(f)
-                with open(old_save, "w", encoding='utf-8') as f:
-                    json.dump(config, f, indent=4, ensure_ascii=False)
-
-        config = {
-            '14': self.oto_heal,
-            '15': self.heal_locate,
-            '16': self.heal_min,
-            '17': self.heal_shortcut,
-            '19': self.oto_mana,
-            '20': self.mana_locate,
-            '21': self.mana_min,
-            '22': self.mana_shortcut,
-            '39': self.Makro_use,
-            '40': self.Makro_use_continuously_bool,
-            '41': self.Makro_keys,
-            '42': self.Makro_ms,
-            '52': self.start_shortcut,
-            '6_8': self.oto_mana_page,
-            '6_9': self.oto_heal_page,
-            'target_locate': self.target_locate  # Hedef çubuğu konumu eklendi
+        config = configparser.ConfigParser()
+        config['Settings'] = {
+            'oto_heal': str(self.oto_heal),
+            'heal_locate': ','.join(map(str, self.heal_locate)),
+            'heal_min': str(self.heal_min),
+            'heal_shortcut': self.heal_shortcut,
+            'oto_mana': str(self.oto_mana),
+            'mana_locate': ','.join(map(str, self.mana_locate)),
+            'mana_min': str(self.mana_min),
+            'mana_shortcut': self.mana_shortcut,
+            'makro_use': str(self.Makro_use),
+            'makro_use_continuously': str(self.Makro_use_continuously_bool),
+            'makro_keys': ','.join(self.Makro_keys) if isinstance(self.Makro_keys, list) else self.Makro_keys,
+            'makro_ms': str(self.Makro_ms),
+            'start_shortcut': self.start_shortcut,
+            'oto_mana_page': self.oto_mana_page,
+            'oto_heal_page': self.oto_heal_page,
+            'target_locate': ','.join(map(str, self.target_locate))
         }
 
-        with open(self.config_file, "w", encoding='utf-8') as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-        QMessageBox.information(self, "Kaydedildi", "Ayarlar başarıyla kaydedildi.\nEski ayarlarınızı görmek için old_save.json dosyasına bakabilirsiniz.")
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            config.write(f)
+        QMessageBox.information(self, "Kaydedildi", "Ayarlar başarıyla kaydedildi.")
 
     def load_config(self):
         if not os.path.exists(self.config_file):
-            QMessageBox.warning(self, "Hata", "Ayarlar dosyası bulunamadı. Lütfen ayarlarınızı kaydedin.")
+            QMessageBox.warning(self, "Hata", "Ayarlar dosyası bulunamadı.")
             return
 
-        with open(self.config_file, "r", encoding='utf-8') as f:
-            config = json.load(f)
-            self.oto_heal = config.get('14', False)
-            self.heal_locate = config.get('15', [])
-            self.heal_min = config.get('16', 15)
-            self.heal_shortcut = config.get('17', '')
-            self.oto_mana = config.get('19', False)
-            self.mana_locate = config.get('20', [])
-            self.mana_min = config.get('21', 15)
-            self.mana_shortcut = config.get('22', '')
-            self.Makro_use = config.get('39', True)
-            self.Makro_use_continuously_bool = config.get('40', False)
-            self.Makro_keys = config.get('41', '')
-            self.Makro_ms = config.get('42', 1)
-            self.start_shortcut = config.get('52', '')
-            self.oto_mana_page = config.get('6_8', 'F Sayfası')
-            self.oto_heal_page = config.get('6_9', 'F Sayfası')
-            self.target_locate = config.get('target_locate', [])  # Hedef çubuğu konumu yüklendi
-        self.fonksiyonlari_cagir()
+        config = configparser.ConfigParser()
+        config.read(self.config_file, encoding='utf-8')
+        
+        if 'Settings' in config:
+            settings = config['Settings']
+            self.oto_heal = settings.getboolean('oto_heal', False)
+            self.heal_locate = [int(x) for x in settings.get('heal_locate', '').split(',') if x]
+            self.heal_min = settings.getint('heal_min', 15)
+            self.heal_shortcut = settings.get('heal_shortcut', '')
+            self.oto_mana = settings.getboolean('oto_mana', False)
+            self.mana_locate = [int(x) for x in settings.get('mana_locate', '').split(',') if x]
+            self.mana_min = settings.getint('mana_min', 15)
+            self.mana_shortcut = settings.get('mana_shortcut', '')
+            self.Makro_use = settings.getboolean('makro_use', True)
+            self.Makro_use_continuously_bool = settings.getboolean('makro_use_continuously', False)
+            makro_keys = settings.get('makro_keys', '')
+            self.Makro_keys = makro_keys.split(',') if ',' in makro_keys else list(makro_keys)
+            self.Makro_ms = settings.getint('makro_ms', 1)
+            self.start_shortcut = settings.get('start_shortcut', '')
+            self.oto_mana_page = settings.get('oto_mana_page', 'F Sayfası')
+            self.oto_heal_page = settings.get('oto_heal_page', 'F Sayfası')
+            self.target_locate = [int(x) for x in settings.get('target_locate', '').split(',') if x]
+            
+            self.fonksiyonlari_cagir()
 
     def fonksiyonlari_cagir(self):
         self.oto_heal_checkbox.setChecked(self.oto_heal)
