@@ -12,14 +12,17 @@ import mss
 import string
 from interception import *
 import ctypes
-from ctypes import wintypes
 import cv2
 import configparser
 
-# Windows API fonksiyonları
-GetForegroundWindow = ctypes.windll.user32.GetForegroundWindow
-GetWindowTextLengthW = ctypes.windll.user32.GetWindowTextLengthW
-GetWindowTextW = ctypes.windll.user32.GetWindowTextW
+def is_process_running(process_name):
+    for proc in psutil.process_iter(['name']):
+        try:
+            if proc.info['name'].lower() == process_name.lower():
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False
 
 class MainWindow(QWidget):
     information_signal = pyqtSignal(str)
@@ -354,9 +357,6 @@ class MainWindow(QWidget):
         if not self.working:
             try:
                 self.Makro_keys = [i for i in self.Makro_keys_input.text().upper()]
-                # Z tuşunu başlangıçta kaldır, hedef tespiti ekleyecek
-                if 'Z' in self.Makro_keys:
-                    self.Makro_keys.remove('Z')
             except ValueError:
                 self.Makro_keys_input = 'Bir hata oluştu'
 
@@ -491,25 +491,41 @@ class MainWindow(QWidget):
         return has_target
 
     def target_detection_helper(self):
-        print("Hedef tespit sistemi başlatıldı...")
         while self.working and self.target_detection:
-            if self.is_knight_online_active():
-                try:
-                    self.check_target()
-                except Exception as e:
-                    print(f"Hedef tespitinde hata: {e}")
+            try:
+                if len(self.target_locate) == 2:
+                    self.take_screenshot((self.target_locate[0], self.target_locate[1], self.target_locate[0] + 1, self.target_locate[1] + 1))
+                    rgb = self.screenshot[0, 0]
+                    # Hedef çubuğu genellikle kırmızı renktedir
+                    if rgb[2] > 200 and rgb[1] < 50 and rgb[0] < 50:  # Kırmızı renk kontrolü
+                        self.last_target_state = True
+                    else:
+                        self.last_target_state = False
+            except Exception as e:
+                print(f"Hedef tespitinde hata: {e}")
             time.sleep(0.1)  # Her 100ms'de bir kontrol et
-        print("Hedef tespit sistemi durduruldu.")
 
     def Makro(self):
         while (self.working and self.Makro_use and self.Makro_using):
-            if self.is_knight_online_active():
-                # Her döngüde tuşları karıştır
-                current_keys = self.Makro_keys.copy()
-                random.shuffle(current_keys)
-                for i in current_keys:
-                    self.tusbas(self.keycodes[i], 0.001)
-            time.sleep(self.Makro_ms/1000)
+            # Tuşları sırayla bas
+            for i in self.Makro_keys:
+                if not (self.working and self.Makro_use and self.Makro_using):
+                    break
+                self.tusbas(self.keycodes[i], 0.0001)
+                time.sleep(self.Makro_ms/1000)
+            
+            # Hedef yoksa Z ve hemen ardından R tuşuna bas
+            if len(self.target_locate) == 2 and not self.last_target_state:
+                # Z ve R tuşlarını çok hızlı bas
+                self.tusbas(self.keycodes['Z'], 0.0001)
+                self.tusbas(self.keycodes['R'], 0.0001)
+                time.sleep(self.Makro_ms/1000)
+            
+            # Sürekli kullanım seçili değilse döngüyü bitir
+            if not self.Makro_use_continuously_bool:
+                self.working = False
+                self.start_stop_shortcut_buton.setStyleSheet("background-color: #702F2F; color: #FFFFFF;")
+                break
 
     def heal_mana_helper(self):
         if len(self.heal_locate) == 2:
@@ -567,7 +583,7 @@ class MainWindow(QWidget):
     def tusbas(self, key, gecikme):
         interception_press = key_stroke(key, interception_key_state.INTERCEPTION_KEY_DOWN.value, 0)
         self.driver.send(self.keyboard, interception_press)
-        time.sleep(gecikme)
+        time.sleep(gecikme)  # 0.0001 saniye (0.1ms) gecikme
         interception_press.state = interception_key_state.INTERCEPTION_KEY_UP.value
         self.driver.send(self.keyboard, interception_press)
 
@@ -762,12 +778,8 @@ class MainWindow(QWidget):
         self.Makro_ms_changed()
 
     def is_knight_online_active(self):
-        hwnd = GetForegroundWindow()
-        length = GetWindowTextLengthW(hwnd)
-        buff = ctypes.create_unicode_buffer(length + 1)
-        GetWindowTextW(hwnd, buff, length + 1)
-        window_title = buff.value
-        return any(title in window_title for title in ["Knight OnLine Client", "KnightOnLine", "Knight Online"])
+        # Sadece process kontrolü yap
+        return is_process_running("warfarex_64.exe")
 
     def reset_config(self):
         # Onay mesajı göster

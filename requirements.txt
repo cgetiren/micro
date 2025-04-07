@@ -3,4 +3,5 @@ PyQt5
 pynput
 mss
 numpy
-interception 
+interception
+psutil 
